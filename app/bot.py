@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 
-from telegram import Update
+from telegram import BotCommand, Update
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -74,6 +74,51 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text(HELP_TEXT, parse_mode="Markdown")
 
 
+async def set_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE, mode: str) -> None:
+    """Set processing mode for user."""
+    user_id = update.message.from_user.id
+    context.user_data["mode"] = mode
+
+    mode_descriptions = {
+        "plain": "Plain transcription (no extras)",
+        "summary": "Transcription + summary",
+        "translate_en": "Transcription + translate to English",
+        "translate_es": "Transcription + translate to Spanish",
+        "voice": "Transcription + voice reply",
+    }
+
+    await update.message.reply_text(
+        f"Mode set: *{mode_descriptions.get(mode, mode)}*\n\n"
+        "Now send me a voice note or audio file!",
+        parse_mode="Markdown",
+    )
+
+
+async def mode_plain(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Set plain transcription mode."""
+    await set_mode_command(update, context, "plain")
+
+
+async def mode_summary(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Set summary mode."""
+    await set_mode_command(update, context, "summary")
+
+
+async def mode_translate_en(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Set translate to English mode."""
+    await set_mode_command(update, context, "translate_en")
+
+
+async def mode_translate_es(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Set translate to Spanish mode."""
+    await set_mode_command(update, context, "translate_es")
+
+
+async def mode_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Set voice reply mode."""
+    await set_mode_command(update, context, "voice")
+
+
 def is_supported_document(doc) -> bool:
     """Check if a document is a supported audio/video file."""
     if doc is None:
@@ -127,8 +172,20 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
 
-    # Parse options from caption
+    # Parse options from caption or use saved mode
     options = parse_options(caption)
+
+    # Apply saved mode if no caption options provided
+    if not caption:
+        mode = context.user_data.get("mode", "plain")
+        if mode == "summary":
+            options.summary = True
+        elif mode == "translate_en":
+            options.translate = "en"
+        elif mode == "translate_es":
+            options.translate = "es"
+        elif mode == "voice":
+            options.voice = True
 
     # Create job directory
     job_id, job_dir = create_job_dir()
@@ -238,16 +295,35 @@ async def handle_unsupported(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
 
+async def post_init(application: Application) -> None:
+    """Set up bot commands menu after initialization."""
+    commands = [
+        BotCommand("start", "Start the bot"),
+        BotCommand("help", "Show help"),
+        BotCommand("plain", "Plain transcription"),
+        BotCommand("summary", "Transcribe + summarize"),
+        BotCommand("english", "Transcribe + translate to English"),
+        BotCommand("spanish", "Transcribe + translate to Spanish"),
+        BotCommand("voice", "Transcribe + voice reply"),
+    ]
+    await application.bot.set_my_commands(commands)
+
+
 def create_application() -> Application:
     """Create and configure the Telegram application."""
     if not TELEGRAM_BOT_TOKEN:
         raise ValueError("TELEGRAM_BOT_TOKEN environment variable is required")
 
-    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
 
     # Command handlers
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("plain", mode_plain))
+    app.add_handler(CommandHandler("summary", mode_summary))
+    app.add_handler(CommandHandler("english", mode_translate_en))
+    app.add_handler(CommandHandler("spanish", mode_translate_es))
+    app.add_handler(CommandHandler("voice", mode_voice))
 
     # Audio handlers
     app.add_handler(MessageHandler(filters.VOICE, handle_audio))
