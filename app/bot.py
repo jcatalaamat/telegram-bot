@@ -12,6 +12,7 @@ from telegram.ext import (
     filters,
 )
 
+from app.ai_utils import summarize_text, text_to_speech, translate_text
 from app.audio_utils import (
     cleanup_job_dir,
     convert_to_wav,
@@ -40,23 +41,23 @@ I can transcribe voice notes and audio files for you.
 - Audio files (drag & drop)
 - WhatsApp voice exports (.opus, .ogg, .m4a)
 
-*Supported formats:*
-.ogg, .opus, .m4a, .mp3, .wav, .mp4, .webm, .mkv
-
 *Options (add to caption):*
-- `lang=XX` - Force language (en, es, ca, fr, etc.)
+- `lang=XX` - Source language hint (en, es, ca, fr)
+- `translate=XX` - Translate to language (en, es, ca, fr)
+- `summary=1` - Get bullet-point summary
+- `voice=1` - Reply with audio
 - `timestamps=1` - Include timestamps
 
 *Examples:*
-- Send a voice note (auto-detect language)
-- Send audio with caption: `lang=es`
-- Send file with caption: `timestamps=1 lang=en`
+- Voice note → transcription
+- Caption `translate=en` → transcribe + translate to English
+- Caption `summary=1` → transcribe + summarize
+- Caption `voice=1` → transcribe + voice reply
+- Caption `translate=en summary=1` → translate + summarize
 
 *Limits:*
 - Max duration: 10 minutes
 - Max file size: 25MB
-
-*Tip:* To export WhatsApp voice messages, long-press the message in WhatsApp and choose "Forward" or "Share", then send it here.
 """.strip()
 
 
@@ -175,27 +176,48 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             )
             return
 
-        # Send transcription
+        # Start with transcription
+        final_text = result.text
+        header_parts = [f"Transcription (detected: {result.language})"]
+
+        # Translate if requested
+        if options.translate:
+            await status_msg.edit_text(f"Translating to {options.translate}...")
+            final_text = translate_text(final_text, options.translate)
+            header_parts.append(f"translated to {options.translate}")
+
+        # Summarize if requested
+        if options.summary:
+            await status_msg.edit_text("Summarizing...")
+            final_text = summarize_text(final_text)
+            header_parts.append("summarized")
+
+        # Build header
+        if options.timestamps and not options.summary:
+            header_parts.append("with timestamps")
+        header = ", ".join(header_parts) + ":"
+
+        # Delete status message
         await status_msg.delete()
 
-        # Header with metadata
-        header = f"Transcription (detected: {result.language})"
-        if options.timestamps:
-            header += " with timestamps"
-        header += ":"
-
-        # Split into chunks if needed
-        chunks = chunk_text(result.text)
-
+        # Send text transcription
+        chunks = chunk_text(final_text)
         for i, chunk in enumerate(chunks):
             if i == 0:
                 text = f"{header}\n\n{chunk}"
             else:
                 text = chunk
-
             await message.reply_text(text)
 
-        logger.info(f"Job {job_id}: Sent {len(chunks)} message(s)")
+        # Send voice reply if requested
+        if options.voice:
+            voice_status = await message.reply_text("Generating voice...")
+            voice_path = job_dir / "reply.mp3"
+            text_to_speech(final_text, voice_path)
+            await voice_status.delete()
+            await message.reply_voice(voice=open(voice_path, "rb"))
+
+        logger.info(f"Job {job_id}: Completed successfully")
 
     except Exception as e:
         logger.exception(f"Job {job_id}: Error processing audio")

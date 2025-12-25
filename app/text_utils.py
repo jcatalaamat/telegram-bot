@@ -11,16 +11,22 @@ MAX_CHUNK_SIZE = 3500
 class TranscribeOptions:
     """Options parsed from user message."""
 
-    language: str | None = None  # e.g., 'en', 'es', 'ca', 'fr'
+    language: str | None = None  # e.g., 'en', 'es', 'ca', 'fr' (source language hint)
     timestamps: bool = False
+    translate: str | None = None  # Target language for translation, e.g., 'en', 'es'
+    summary: bool = False  # Summarize the transcription
+    voice: bool = False  # Reply with voice audio
 
 
 def parse_options(text: str | None) -> TranscribeOptions:
     """Parse transcription options from caption or message text.
 
     Supported options:
-        lang=XX (language code)
-        timestamps=1 or timestamps=0
+        lang=XX (source language hint)
+        timestamps=1 (include timestamps)
+        translate=XX (translate to language)
+        summary=1 (summarize the content)
+        voice=1 (reply with audio)
 
     Args:
         text: Caption or message text (may be None)
@@ -42,6 +48,21 @@ def parse_options(text: str | None) -> TranscribeOptions:
     ts_match = re.search(r"\btimestamps=([01])\b", text, re.IGNORECASE)
     if ts_match:
         options.timestamps = ts_match.group(1) == "1"
+
+    # Parse translate: translate=XX
+    translate_match = re.search(r"\btranslate=(\w{2,3})\b", text, re.IGNORECASE)
+    if translate_match:
+        options.translate = translate_match.group(1).lower()
+
+    # Parse summary: summary=1
+    summary_match = re.search(r"\bsummary=([01])\b", text, re.IGNORECASE)
+    if summary_match:
+        options.summary = summary_match.group(1) == "1"
+
+    # Parse voice: voice=1
+    voice_match = re.search(r"\bvoice=([01])\b", text, re.IGNORECASE)
+    if voice_match:
+        options.voice = voice_match.group(1) == "1"
 
     return options
 
