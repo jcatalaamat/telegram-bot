@@ -1,36 +1,28 @@
-"""Transcription using faster-whisper."""
+"""Transcription using OpenAI Whisper API."""
 
 import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from faster_whisper import WhisperModel
+from openai import OpenAI
 
-from app.config import WHISPER_COMPUTE_TYPE, WHISPER_DEVICE, WHISPER_MODEL
+from app.config import OPENAI_API_KEY
 
 logger = logging.getLogger(__name__)
 
-# Global model instance (loaded once)
-_model: WhisperModel | None = None
+# OpenAI client
+_client: OpenAI | None = None
 
 
-def get_model() -> WhisperModel:
-    """Get or initialize the Whisper model."""
-    global _model
+def get_client() -> OpenAI:
+    """Get or initialize the OpenAI client."""
+    global _client
 
-    if _model is None:
-        logger.info(
-            f"Loading Whisper model: {WHISPER_MODEL} "
-            f"(device={WHISPER_DEVICE}, compute_type={WHISPER_COMPUTE_TYPE})"
-        )
-        _model = WhisperModel(
-            WHISPER_MODEL,
-            device=WHISPER_DEVICE,
-            compute_type=WHISPER_COMPUTE_TYPE,
-        )
-        logger.info("Whisper model loaded successfully")
+    if _client is None:
+        logger.info("Initializing OpenAI client")
+        _client = OpenAI(api_key=OPENAI_API_KEY)
 
-    return _model
+    return _client
 
 
 @dataclass
@@ -54,49 +46,58 @@ def transcribe_audio(
     language: str | None = None,
     with_timestamps: bool = False,
 ) -> TranscriptionResult:
-    """Transcribe audio file using faster-whisper.
+    """Transcribe audio file using OpenAI Whisper API.
 
     Args:
-        audio_path: Path to WAV audio file
+        audio_path: Path to audio file
         language: Optional language code (e.g., 'en', 'es'). None for auto-detect.
         with_timestamps: Include timestamps in output
 
     Returns:
         TranscriptionResult with text and metadata
     """
-    model = get_model()
+    client = get_client()
 
     logger.debug(f"Transcribing: {audio_path} (lang={language or 'auto'})")
 
-    segments_iter, info = model.transcribe(
-        str(audio_path),
-        language=language,
-        beam_size=5,
-        vad_filter=True,
-    )
-
-    detected_lang = info.language
-    logger.debug(f"Detected language: {detected_lang}")
-
-    segments: list[tuple[float, float, str]] = []
-    text_parts: list[str] = []
-
-    for segment in segments_iter:
-        seg_text = segment.text.strip()
-        if not seg_text:
-            continue
-
-        segments.append((segment.start, segment.end, seg_text))
-
+    with open(audio_path, "rb") as audio_file:
         if with_timestamps:
-            text_parts.append(f"{format_timestamp(segment.start)} {seg_text}")
-        else:
-            text_parts.append(seg_text)
+            # Use verbose_json to get segments with timestamps
+            response = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                language=language,
+                response_format="verbose_json",
+            )
 
-    if with_timestamps:
-        full_text = "\n".join(text_parts)
-    else:
-        full_text = " ".join(text_parts)
+            detected_lang = response.language or "unknown"
+            segments: list[tuple[float, float, str]] = []
+            text_parts: list[str] = []
+
+            for segment in response.segments or []:
+                seg_text = segment.get("text", "").strip()
+                if not seg_text:
+                    continue
+
+                start = segment.get("start", 0)
+                end = segment.get("end", 0)
+                segments.append((start, end, seg_text))
+                text_parts.append(f"{format_timestamp(start)} {seg_text}")
+
+            full_text = "\n".join(text_parts)
+
+        else:
+            # Simple transcription without timestamps
+            response = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                language=language,
+                response_format="json",
+            )
+
+            full_text = response.text
+            detected_lang = "auto"
+            segments = []
 
     logger.info(f"Transcription complete: {len(full_text)} chars, lang={detected_lang}")
 

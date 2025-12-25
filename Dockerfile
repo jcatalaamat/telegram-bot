@@ -23,9 +23,6 @@ RUN mkdir -p /tmp/telegram_whisper_bot
 # Set environment defaults
 ENV PYTHONUNBUFFERED=1
 ENV TMP_DIR=/tmp/telegram_whisper_bot
-ENV WHISPER_MODEL=small
-ENV WHISPER_DEVICE=cpu
-ENV WHISPER_COMPUTE_TYPE=int8
 
 # Run the bot
 CMD ["python", "-m", "app.main"]

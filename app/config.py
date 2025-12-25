@@ -11,10 +11,8 @@ load_dotenv()
 # Telegram
 TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
-# Whisper
-WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "small")
-WHISPER_DEVICE: str = os.getenv("WHISPER_DEVICE", "cpu")
-WHISPER_COMPUTE_TYPE: str = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
+# OpenAI
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
 # Limits
 MAX_AUDIO_SECONDS: int = int(os.getenv("MAX_AUDIO_SECONDS", "600"))
