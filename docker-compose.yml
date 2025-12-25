@@ -1,0 +1,20 @@
+services:
+  telegram-bot:
+    build: .
+    container_name: telegram-transcription-bot
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - WHISPER_MODEL=${WHISPER_MODEL:-small}
+      - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
+      - WHISPER_COMPUTE_TYPE=${WHISPER_COMPUTE_TYPE:-int8}
+      - MAX_AUDIO_SECONDS=${MAX_AUDIO_SECONDS:-600}
+      - MAX_FILE_MB=${MAX_FILE_MB:-25}
+      - TMP_DIR=/tmp/telegram_whisper_bot
+    volumes:
+      - whisper_cache:/root/.cache/huggingface
+    tmpfs:
+      - /tmp/telegram_whisper_bot:size=512M
+
+volumes:
+  whisper_cache:
