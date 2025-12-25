@@ -4,7 +4,7 @@ import logging
 import sys
 
 from app.bot import create_application
-from app.config import TMP_DIR, WHISPER_MODEL
+from app.config import TMP_DIR
 
 
 def setup_logging() -> None:
@@ -28,8 +28,7 @@ def main() -> None:
     # Ensure temp directory exists
     TMP_DIR.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Starting Telegram Transcription Bot")
-    logger.info(f"Whisper model: {WHISPER_MODEL}")
+    logger.info("Starting Telegram Transcription Bot (OpenAI Whisper API)")
     logger.info(f"Temp directory: {TMP_DIR}")
 
     app = create_application()
