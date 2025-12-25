@@ -14,6 +14,10 @@ TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
 # OpenAI
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
+# Webhook settings (for free hosting like Render)
+WEBHOOK_URL: str = os.getenv("WEBHOOK_URL", "")  # e.g., https://your-app.onrender.com
+PORT: int = int(os.getenv("PORT", "8080"))
+
 # Limits
 MAX_AUDIO_SECONDS: int = int(os.getenv("MAX_AUDIO_SECONDS", "600"))
 MAX_FILE_MB: int = int(os.getenv("MAX_FILE_MB", "25"))
