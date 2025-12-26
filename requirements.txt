@@ -1,5 +1,5 @@
-# Telegram Bot
-python-telegram-bot==21.7
+# Telegram Bot (with webhook support)
+python-telegram-bot[webhooks]==21.7
 
 # OpenAI Whisper API
 openai>=1.0.0
