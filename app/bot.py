@@ -148,7 +148,7 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if message.voice:
         file_obj = message.voice
         original_filename = None
-        caption = None
+        caption = message.caption
     elif message.audio:
         file_obj = message.audio
         original_filename = message.audio.file_name
